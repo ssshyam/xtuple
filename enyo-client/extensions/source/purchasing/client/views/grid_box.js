@@ -49,9 +49,12 @@ trailing:true, white:true, strict:false*/
     enyo.kind({
       name: "XV.PurchaseOrderLineGridBox",
       kind: "XV.GridBox",
-      classes: "medium-panel",
+      classes: "large-panel",
       title: "_lineItems".loc(),
       gridRowKind: "XV.PurchaseOrderLineRow",
+      workspace: "XV.PurchaseOrderLineWorkspace",
+      summary: "XV.PurchaseOrderSummaryPanel",
+      parentKey: "purchaseOrder",
       columns: [
         {classes: "line-number", header: "#", rows: [
           {readOnlyAttr: "lineNumber",
@@ -74,7 +77,9 @@ trailing:true, white:true, strict:false*/
             editor: {kind: "XV.QuantityWidget", attr: "quantity",
               name: "quantityWidget"}},
           {readOnlyAttr: "vendorUnit",
-            editor: {kind: "XV.InputWidget", attr: "vendorUnit"}}
+            editor: {kind: "XV.InputWidget", attr: "vendorUnit"}},
+          {readOnlyAttr: "getPurchaseOrderStatusString",
+            editor: {kind: "XV.PurchaseOrderStatusPicker", attr: "status"}}
         ]},
         {classes: "price", header: "_price".loc(), rows: [
           {readOnlyAttr: "price",
@@ -92,16 +97,20 @@ trailing:true, white:true, strict:false*/
           {readOnlyAttr: "dueDate",
             editor: {kind: "XV.DateWidget", attr: "dueDate"}}
         ]},
+        {classes: "date", header: ["_vendorItem".loc(), "_manufacturerItem".loc()], rows: [
+          {readOnlyAttr: "vendorItemNumber",
+            editor: {kind: "XV.InputWidget", attr: "vendorItemNumber"}},
+          {readOnlyAttr: "manufacturerItemNumber",
+            editor: {kind: "XV.InputWidget", attr: "manufacturerItemNumber"}},
+        ]},
         {classes: "quantity", header: ["_received".loc(), "_vouchered".loc()], rows: [
           {readOnlyAttr: "received",
             editor: {kind: "XV.QuantityWidget", attr: "received",
               name: "shippedWidget"}},
           {readOnlyAttr: "vouchered",
-            editor: {kind: "XV.QuantityWidget", attr: "vouchered",
-              name: "receivedWidget"}},
+            editor: {kind: "XV.QuantityWidget", attr: "vouchered"}},
         ]}
-      ],
-      workspace: "XV.PurchaseOrderLineWorkspace"
+      ]
     });
 
     enyo.kind({

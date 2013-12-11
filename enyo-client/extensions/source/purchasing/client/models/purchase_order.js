@@ -90,25 +90,110 @@ white:true*/
       numberPolicySetting: 'PONumberGeneration',
 
       defaults: function () {
+        var agent = XM.agents.find(function (agent) {
+            return agent.id === XM.currentUser.id;
+          });
         return {
           orderDate: XT.date.today(),
           status: XM.PurchaseOrder.UNRELEASED_STATUS,
-          site: XT.defaultSite()
+          site: XT.defaultSite(),
+          agent: agent ? agent.id : null
         };
       },
 
       readOnlyAttributes: [
+        "freightSubtotal",
         "lineItems",
         "releaseDate",
-        "status"
+        "status",
+        "subtotal",
+        "taxTotal",
+        "total"
       ],
 
       handlers: {
         "add:lineItems": "lineItemsChanged",
+        "add:lineItems remove:lineItems": "calculateTotals",
         "remove:lineItems": "lineItemsChanged",
         "change:status": "purchaseOrderStatusChanged",
         "change:purchaseType": "purchaseTypeChanged",
         "change:vendor": "vendorChanged"
+      },
+
+      calculateTotals: function () {
+        var freight = this.get("freight") || 0.0,
+          scale = XT.MONEY_SCALE,
+          add = XT.math.add,
+          subtract = XT.math.subtract,
+          subtotals = [],
+          taxDetails = [],
+          costs = [],
+          freightSubtotals = [],
+          subtotal,
+          freightSubtotal,
+          taxTotal = 0.0,
+          total,
+          taxCodes;
+
+        // Collect line item detail
+        var forEachCalcFunction = function (lineItem) {
+          var extPrice = lineItem.get('extendedPrice') || 0,
+            quantity = lineItem.get("quantity") || 0,
+            freight = lineItem.get("freight") || 0,
+            item = lineItem.get("item"),
+            quantityUnitRatio = lineItem.get("quantityUnitRatio");
+
+          subtotals.push(extPrice);
+          freightSubtotals.push(freight);
+          taxDetails = taxDetails.concat(lineItem.taxDetail);
+        };
+
+        _.each(this.get('lineItems').models, forEachCalcFunction);
+
+        // Add freight taxes to the mix
+        taxDetails = taxDetails.concat(this.freightTaxDetail);
+
+        // Total taxes
+        // First group amounts by tax code
+        taxCodes = _.groupBy(taxDetails, function (detail) {
+          return detail.taxCode.id;
+        });
+
+        // Loop through each tax code group and subtotal
+        _.each(taxCodes, function (group) {
+          var taxes = [],
+            subtotal;
+
+          // Collect array of taxes
+          _.each(group, function (detail) {
+            taxes.push(detail.tax);
+          });
+
+          // Subtotal first to make sure we round by subtotal
+          subtotal = add(taxes, 6);
+
+          // Now add to tax grand total
+          taxTotal = add(taxTotal, subtotal, scale);
+        });
+
+        // Totaling calculations
+        freightSubtotal = add(freightSubtotals, scale);
+        subtotal = add(subtotals, scale);
+        subtotals = subtotals.concat([freightSubtotal, freight, taxTotal]);
+        total = add(subtotals, scale);
+
+        // Set values
+        this.set("freightSubtotal", freightSubtotal);
+        this.set("subtotal", subtotal);
+        this.set("taxTotal", taxTotal);
+        this.set("total", total);
+      },
+
+      initialize: function (attributes, options) {
+        XM.Document.prototype.initialize.apply(this, arguments);
+        if (XT.session.settings.get("RequirePOTax")) {
+          this.requiredAttributes.push("taxZone");
+        }
       },
 
       vendorChanged: function () {
@@ -143,7 +228,7 @@ white:true*/
 
       lineItemsChanged: function () {
         var hasLineItems = this.get("lineItems").length > 0;
-        this.setReadOnly(["vendor"], hasLineItems);
+        this.setReadOnly(["vendor", "currency"], hasLineItems);
         this.setReadOnly("status", !hasLineItems);
         if (!hasLineItems) {
           this.set("status", XM.PurchaseOrder.UNRELEASED_STATUS);
@@ -174,13 +259,47 @@ white:true*/
       statusDidChange: function () {
         XM.Document.prototype.statusDidChange.apply(this, arguments);
         var status = this.getStatus(),
-          K = XM.Model;
+          K = XM.Model,
+          lineCount;
         if (status === K.READY_NEW) {
           // TO DO
         } else if (status === K.READY_CLEAN) {
           this.setReadOnly("lineItems", false);
+          this.lineItemsChanged();
         }
       },
+
+      validate: function () {
+        var err = XM.Document.prototype.validate.apply(this, arguments),
+          lineItems = this.get("lineItems"),
+          status = this.get("status"),
+          K = XM.PurchaseOrder,
+          validItems;
+
+        // Check that we have line items
+        if (!err) {
+          validItems = _.filter(lineItems.models, function (item) {
+            return item.previousStatus() !== K.DESTROYED_DIRTY;
+          });
+
+          if (!validItems.length) {
+            return XT.Error.clone('xt2012');
+          }
+        }
+
+        // Check for valid po status
+        if (status === K.UNRELEASED_STATUS) {
+          lineItems.each(function (item) {
+            if (item.get("toReceive") ||
+                item.get("received") ||
+                item.get("vouchered")) {
+              err = XT.Error.clone('xt2025');
+            }
+          });
+        }
+
+        return err;
+      }
 
     });
 
@@ -302,6 +421,7 @@ white:true*/
         "lineNumber",
         "received",
         "returned",
+        "status",
         "toReceive",
         "unitCost",
         "vendorUnit",
@@ -317,6 +437,48 @@ white:true*/
         "change:purchaseOrder": "purchaseOrderChanged"
       },
 
+      taxDetail: null,
+
+      initialize: function (attributes, options) {
+        XM.Model.prototype.initialize.apply(this, arguments);
+        this.taxDetail = [];
+      },
+
+      destroy: function (options) {
+        var status = this.getParent().get("status"),
+          K = XM.PurchaseOrder,
+          that = this,
+          payload = {
+            type: K.QUESTION,
+          },
+          args = arguments,
+          message;
+
+        if (status === K.UNRELEASED_STATUS) {
+          message = "_deleteLine?".loc();
+          payload.callback = function (response) {
+            if (response.answer) {
+              XM.Model.prototype.destroy.apply(that, args);
+            }
+          };
+        } else if (status === K.OPEN_STATUS) {
+          message = "_closeLine?".loc();
+          payload.callback = function (response) {
+            if (response.answer) {
+              that.set("status", K.CLOSED_STATUS);
+              if (options && options.success) {
+                options.success(that, response, options);
+              }
+            }
+          };
+        } else {
+          // Must be closed, shouldn't have come here.
+          return;
+        }
+
+        this.notify(message, payload);
+      },
+
       isMiscellaneousChanged: function () {
         var isMisc = this.get("isMiscellaneous");
         this.setReadOnly("isMiscellaneous", this.get("item") || this.get("expenseCategory"));
@@ -327,7 +489,7 @@ white:true*/
       itemChanged: function () {
         var item = this.get("item");
         this.isMiscellaneousChanged();
-        this.set("unit", item ? item.getValue("inventoryUnit.name") : "");
+        this.set("vendorUnit", item ? item.getValue("inventoryUnit.name") : "");
         this.set("unitCost", item ? item.getValue("standardCost") : 0);
       },
 
@@ -355,10 +517,14 @@ white:true*/
       statusChanged: function () {
         if (this.getStatus() === XM.Model.READY_CLEAN) {
           this.isMiscellaneousChanged();
+        } else if (this.isDestroyed()) {
+          this.get("purchaseOrder").calculateTotals();
         }
       }
 
     });
+
+    XM.PurchaseOrderLine = XM.PurchaseOrderLine.extend(XM.PurchaseOrderMixin);
 
     /**
       @class
@@ -383,6 +549,17 @@ white:true*/
       recordType: "XM.PurchaseOrderListItem",
 
       editableModel: "XM.PurchaseOrder"
+
+    });
+
+    /**
+      @class
+
+      @extends XM.Model
+    */
+    XM.PurchaseOrderCharacteristic = XM.Model.extend(/** @lends XM.PurchaseOrderListItemCharacteristic.prototype */{
+
+      recordType: 'XM.PurchaseOrderListItemCharacteristic'
 
     });
 

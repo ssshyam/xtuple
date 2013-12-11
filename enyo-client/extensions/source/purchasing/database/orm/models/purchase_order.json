@@ -408,21 +408,24 @@
         "attr": {
           "type": "String",
           "column": "pohead_number",
-          "isNaturalKey": true
+          "isNaturalKey": true,
+          "required": true
          }
       },
       {
         "name": "status",
         "attr": {
           "type": "String",
-          "column": "pohead_status"
+          "column": "pohead_status",
+          "required": true
         }
       },
       {
         "name": "orderDate",
         "attr": {
           "type": "Date",
-          "column": "pohead_orderdate"
+          "column": "pohead_orderdate",
+          "required": true
         }
       },
       {
@@ -437,7 +440,8 @@
         "toOne": {
           "type": "VendorRelation",
           "column": "pohead_vend_id",
-          "isNested": true
+          "isNested": true,
+          "required": true
         }
       },
       {
@@ -503,7 +507,8 @@
         "toOne": {
           "type": "Currency",
           "column": "pohead_curr_id",
-          "isNested": true
+          "isNested": true,
+          "required": true
         }
       },
       {
@@ -793,7 +798,7 @@
         }
       }, 
       {
-        "name": "taxtTotal",
+        "name": "taxTotal",
         "attr": {
           "type": "Money",
           "column": "tax_total"
@@ -958,14 +963,6 @@
     "table": "charass",
     "idSequenceName": "charass_charass_id_seq",
     "comment": "Purchase Order Characteristic Map",
-    "privileges": {
-      "all": {
-        "create": true,
-        "read": true,
-        "update": true,
-        "delete": true
-      }
-    },
     "properties": [
       {
         "name": "id",
@@ -1349,7 +1346,7 @@
         "name": "toReceive",
         "attr": {
           "type": "Quantity",
-          "column": "poitem_qty_toreceive"
+          "column": "qty_toreceive"
         }
       },
       {
@@ -1642,12 +1639,69 @@
         "name": "characteristics",
         "toMany": {
           "isNested": true,
-          "type": "PurchaseOrderCharacteristic",
+          "type": "PurchaseOrderListItemCharacteristic",
           "column": "pohead_id",
           "inverse": "purchaseOrder"
         }
       }
     ],
+    "isSystem": true
+  },
+  {
+    "context": "purchasing",
+    "nameSpace": "XM",
+    "type": "PurchaseOrderListItemCharacteristic",
+    "table": "charass",
+    "comment": "Purchase Order List Item Characteristic Map",
+    "properties": [
+      {
+        "name": "id",
+        "attr": {
+          "type": "Number",
+          "column": "charass_id",
+          "isPrimaryKey": true
+        }
+      },
+      {
+        "name": "uuid",
+        "attr": {
+          "type": "String",
+          "column": "obj_uuid",
+          "isNaturalKey": true
+        }
+      },
+      {
+        "name": "targetType",
+        "attr": {
+          "type": "String",
+          "column": "charass_target_type",
+          "value": "PO"
+        }
+      },
+      {
+        "name": "purchaseOrder",
+        "attr": {
+          "type": "Number",
+          "column": "charass_target_id"
+        }
+      },
+      {
+        "name": "characteristic",
+        "toOne": {
+          "type": "Characteristic",
+          "column": "charass_char_id",
+          "required": true
+        }
+      },
+      {
+        "name": "value",
+        "attr": {
+          "type": "String",
+          "column": "charass_value"
+        }
+      }
+    ],
+    "isNestedOnly": true,
     "isSystem": true
   },
   {

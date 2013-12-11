@@ -7,10 +7,15 @@ strict:true, trailing:true, white:true */
   "use strict";
 
   var lang = XT.stringsFor("en_US", {
+    "_freightSubtotal": "Freight Subtotal",
     "_itemSource": "Item Source",
     "_itemSources": "Item Sources",
+    "_isDropShip": "Drop Ship",
     "_manufacturer": "Manufacturer",
+    "_manufacturerItem": "Mfg. Item",
     "_purchasing": "Purchasing",
+    "_purchaseEmailProfile": "Purchase Email Profile",
+    "_purchaseEmailProfiles": "Purhase Email",
     "_purchaseOrder": "Purchase Order",
     "_purchaseOrderLine": "Purchase Order Line",
     "_purchaseOrderWorkflow": "Purchase Workflow",
@@ -19,6 +24,7 @@ strict:true, trailing:true, white:true */
     "_purchaseTypes": "Purchase Types",
     "_releaseDate": "Release Date",
     "_unitRatio": "Unit Ratio",
+    "_vendorItem": "Vendor Item",
     "_vouchered": "Vouchered"
   });
 
