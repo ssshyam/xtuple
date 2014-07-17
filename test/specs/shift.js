@@ -29,6 +29,8 @@
       cacheName: null,
       listKind: "XV.ShiftList",
       instanceOf: "XM.Document",
+      skipCrud: true,
+      skipSmoke: true,
 
       /**
         @member Settings
@@ -55,13 +57,8 @@
       privileges: {
         createUpdateDelete: "MaintainShifts",
         read: true
-      },
+      }
 
-      createHash: {
-        number: "test-Shift123" + Math.random(),
-		name: "test-Shift123" + Math.random()
-      },
-      updatableField: "name"
     };
 
   var additionalTests =  function () {
